@@ -1,121 +1,121 @@
 # Fedora Dev Setup
 
-Script para preparar una instalacion fresca de Fedora para desarrollo web y trabajo diario con GitHub.
+Scripts to prepare a fresh Fedora installation for web development and day-to-day GitHub work.
 
-## Archivos
+## Files
 
-- `fedora-dev-setup.sh`: entrypoint en `bash`
-- `fedora-dev-setup-zsh.zsh`: entrypoint en `zsh`
+- `fedora-dev-setup.sh`: `bash` entrypoint
+- `fedora-dev-setup-zsh.zsh`: `zsh` entrypoint
 
-## Requisitos
+## Requirements
 
-- Fedora Workstation o Fedora base
-- usuario normal con `sudo`
-- conexion a internet
+- Fedora Workstation or a Fedora base install
+- a regular user with `sudo`
+- an internet connection
 
-Ambos scripts detectan la distro leyendo `/etc/os-release` y abortan si no encuentran Fedora.
+Both scripts detect the distribution by reading `/etc/os-release` and abort if Fedora is not found.
 
 ## Entrypoints
 
-Los dos archivos ya tienen paridad funcional:
+Both files now have feature parity:
 
-- soportan etapas `all`, `bootstrap`, `devtools`, `shell`, `services` y `doctor`
-- comparten la misma logica modular en `lib/fedora-dev-setup/`
-- usan las mismas plantillas versionadas en `templates/`
-- dejan listo un entorno de terminal con `zsh`, `tmux`, `git`, `neovim` y extras opcionales
+- they support the `all`, `bootstrap`, `devtools`, `shell`, `services`, and `doctor` stages
+- they share the same modular logic under `lib/fedora-dev-setup/`
+- they use the same versioned templates under `templates/`
+- they prepare a terminal-focused environment with `zsh`, `tmux`, `git`, `neovim`, and optional extras
 
-La diferencia principal es el shell que ejecuta el entrypoint:
+The main difference is the shell used to run the entrypoint:
 
-- `fedora-dev-setup.sh`: pensado para correr desde `bash`
-- `fedora-dev-setup-zsh.zsh`: pensado para correr desde `zsh`
+- `fedora-dev-setup.sh`: meant to run from `bash`
+- `fedora-dev-setup-zsh.zsh`: meant to run from `zsh`
 
-## Perfiles rapidos
+## Quick Starts
 
-Instalacion base:
+Base installation:
 
 ```bash
 ./fedora-dev-setup.sh --minimal
 ```
 
-Instalacion completa:
+Full installation:
 
 ```bash
 ./fedora-dev-setup.sh \
   --full \
-  --git-name "Tu Nombre" \
-  --git-email "tu@email.com" \
-  --ssh-passphrase "tu-passphrase-ssh" \
-  --gpg-passphrase "tu-passphrase-gpg"
+  --git-name "Your Name" \
+  --git-email "your@email.com" \
+  --ssh-passphrase "your-ssh-passphrase" \
+  --gpg-passphrase "your-gpg-passphrase"
 ```
 
-Instalacion completa desde `bash`:
+Full installation from `bash`:
 
 ```bash
 ./fedora-dev-setup.sh \
   all \
   --full \
-  --git-name "Tu Nombre" \
-  --git-email "tu@email.com" \
-  --ssh-passphrase "tu-passphrase-ssh" \
-  --gpg-passphrase "tu-passphrase-gpg"
+  --git-name "Your Name" \
+  --git-email "your@email.com" \
+  --ssh-passphrase "your-ssh-passphrase" \
+  --gpg-passphrase "your-gpg-passphrase"
 ```
 
-Instalacion completa desde `zsh`:
+Full installation from `zsh`:
 
 ```bash
 ./fedora-dev-setup-zsh.zsh \
   all \
   --full \
-  --git-name "Tu Nombre" \
-  --git-email "tu@email.com" \
-  --ssh-passphrase "tu-passphrase-ssh" \
-  --gpg-passphrase "tu-passphrase-gpg"
+  --git-name "Your Name" \
+  --git-email "your@email.com" \
+  --ssh-passphrase "your-ssh-passphrase" \
+  --gpg-passphrase "your-gpg-passphrase"
 ```
 
-## Que incluyen
+## What They Include
 
-Siempre instala:
+Always installed:
 
-- actualizacion del sistema con `dnf`
-- repo oficial de Visual Studio Code
-- `git`, `gh`, `python`, `pipx`, `node`, `npm`, compiladores y utilidades CLI
+- system update with `dnf`
+- the official Visual Studio Code repository
+- `git`, `gh`, `python`, `pipx`, `node`, `npm`, compilers, and terminal utilities
 - `corepack`, `pnpm`, `yarn`
 - `@openai/codex`, `npm-check-updates`, `typescript`
-- extensiones base de VS Code
+- base VS Code extensions
 
-Ambos entrypoints tambien:
+Both entrypoints also:
 
-- deja configurado `zsh` con historial, completions, `fzf`, aliases y funciones utiles
-- escribe configuracion gestionada en `~/.config/fedora-dev-setup/`
-- configura `tmux`, `git-delta`, `starship` y hooks para `zoxide`, `direnv` y `atuin` cuando estan disponibles
-- puede instalar TPM y plugins de `tmux` como `tmux-resurrect` y `tmux-continuum`
-- instala y deja accesible `lazygit` si el paquete existe en Fedora
-- crea una configuracion modular de `neovim` en `lua/fedora/` y puede pasar a una variante opinionada con `lazy.nvim`, `telescope`, `treesitter`, `gitsigns`, `which-key` y `lualine`
-- puede instalar `podman` y `postgresql` local con flags opcionales o con `--full`
-- puede instalar herramientas de Kubernetes con `--setup-k8s`
-- intenta instalar extras de terminal como `eza`, `bat`, `btop`, `htop`, `tealdeer` y `zoxide`
+- configure `zsh` with history, completions, `fzf`, aliases, and useful functions
+- write managed configuration under `~/.config/fedora-dev-setup/`
+- configure `tmux`, `git-delta`, `starship`, and hooks for `zoxide`, `direnv`, and `atuin` when available
+- can install TPM and `tmux` plugins such as `tmux-resurrect` and `tmux-continuum`
+- install and expose `lazygit` when the package is available on Fedora
+- create a modular `neovim` configuration under `lua/fedora/`, with an optional opinionated variant using `lazy.nvim`, `telescope`, `treesitter`, `gitsigns`, `which-key`, and `lualine`
+- can install local `podman` and `postgresql` with optional flags or with `--full`
+- can install Kubernetes tools with `--setup-k8s`
+- try to install terminal extras such as `eza`, `bat`, `btop`, `htop`, `tealdeer`, and `zoxide`
 
-Opcionalmente puede configurar:
+Optionally configured:
 
-- SSH para GitHub
-- GPG para firmar commits
-- autenticacion con `gh`
-- Podman con compatibilidad `docker`
-- PostgreSQL local
-- `zsh` como shell por defecto
-- aliases utiles para shell
+- SSH for GitHub
+- GPG for commit signing
+- authentication with `gh`
+- Podman with `docker` compatibility
+- local PostgreSQL
+- `zsh` as the default shell
+- useful shell aliases
 
-## Uso custom
+## Custom Usage
 
 ```bash
 ./fedora-dev-setup.sh \
   all \
-  --git-name "Tu Nombre" \
-  --git-email "tu@email.com" \
+  --git-name "Your Name" \
+  --git-email "your@email.com" \
   --setup-ssh \
-  --ssh-passphrase "tu-passphrase-ssh" \
+  --ssh-passphrase "your-ssh-passphrase" \
   --setup-gpg \
-  --gpg-passphrase "tu-passphrase-gpg" \
+  --gpg-passphrase "your-gpg-passphrase" \
   --sign-commits \
   --setup-gh \
   --gh-protocol ssh \
@@ -128,25 +128,25 @@ Opcionalmente puede configurar:
   --skip-vscode
 ```
 
-Ayuda completa:
+Full help:
 
 ```bash
 ./fedora-dev-setup.sh --help
 ```
 
-Ayuda de la variante `zsh`:
+`zsh` variant help:
 
 ```bash
 ./fedora-dev-setup-zsh.zsh --help
 ```
 
-Ejemplo custom de la variante `zsh`:
+Custom example for the `zsh` variant:
 
 ```bash
 ./fedora-dev-setup-zsh.zsh \
   all \
-  --git-name "Tu Nombre" \
-  --git-email "tu@email.com" \
+  --git-name "Your Name" \
+  --git-email "your@email.com" \
   --setup-ssh \
   --setup-gpg \
   --sign-commits \
@@ -159,52 +159,52 @@ Ejemplo custom de la variante `zsh`:
   --make-zsh-default
 ```
 
-Etapas disponibles en ambos entrypoints:
+Stages available in both entrypoints:
 
-- `all`: corre todo el flujo
-- `bootstrap`: actualiza Fedora e instala repos y paquetes base
-- `devtools`: configura npm, corepack, Node global, Git, SSH, GPG, `gh` y extensiones
-- `shell`: escribe `zsh`, `tmux` y `neovim`, y opcionalmente cambia el shell por defecto
-- `services`: instala `podman`, `postgresql` y herramientas de Kubernetes segun flags
-- `doctor`: no instala nada; revisa si el sistema ya cumple las precondiciones y si existen archivos/configs esperados
+- `all`: runs the full workflow
+- `bootstrap`: updates Fedora and installs repositories and base packages
+- `devtools`: configures npm, corepack, global Node tools, Git, SSH, GPG, `gh`, and extensions
+- `shell`: writes `zsh`, `tmux`, and `neovim` configuration, and can optionally change the default shell
+- `services`: installs `podman`, `postgresql`, and Kubernetes tooling depending on the flags used
+- `doctor`: installs nothing; checks whether the system already satisfies the expected prerequisites and whether expected files/configs exist
 
-Precondiciones por etapa:
+Stage preconditions:
 
-- `devtools` espera que ya existan `git`, `npm`, `pipx` y `python3`
-- `shell` espera `zsh`, `tmux` y `nvim`
-- `services` valida `sudo`, `dnf` y `systemctl`
-- si corres una etapa aislada y falta algo, el script te indica usar `bootstrap` o `all`
+- `devtools` expects `git`, `npm`, `pipx`, and `python3` to already exist
+- `shell` expects `zsh`, `tmux`, and `nvim`
+- `services` validates `sudo`, `dnf`, and `systemctl`
+- if you run an isolated stage and something is missing, the script will tell you to use `bootstrap` or `all`
 
-Ejemplos por etapa:
+Examples by stage:
 
 ```bash
 ./fedora-dev-setup.sh bootstrap
 ./fedora-dev-setup.sh doctor --setup-gh --setup-podman --setup-tmux-plugins
 ./fedora-dev-setup-zsh.zsh bootstrap
-./fedora-dev-setup-zsh.zsh devtools --setup-gh --setup-ssh --git-email "tu@email.com"
+./fedora-dev-setup-zsh.zsh devtools --setup-gh --setup-ssh --git-email "your@email.com"
 ./fedora-dev-setup-zsh.zsh shell --setup-tmux-plugins --setup-nvim-extras --make-zsh-default
 ./fedora-dev-setup-zsh.zsh services --setup-podman --setup-postgres --setup-k8s
 ./fedora-dev-setup-zsh.zsh doctor --setup-gh --setup-podman --setup-tmux-plugins
 ```
 
-## Despues de correrlo
+## After Running
 
-1. Reabrir la terminal.
-2. Si activaste `zsh`, volver a iniciar sesion.
-3. Subir la clave SSH publica a GitHub.
-4. Si generaste GPG, subir la clave publica ASCII a GitHub.
-5. Ejecutar `codex --login`.
+1. Reopen the terminal.
+2. If you enabled `zsh`, log in again.
+3. Upload your public SSH key to GitHub.
+4. If you generated GPG, upload the ASCII-armored public key to GitHub.
+5. Run `codex --login`.
 
-## Notas
+## Notes
 
-- `gh auth login` corre de forma interactiva.
-- `--full` activa la mayoria de extras utiles para una maquina principal de desarrollo.
-- tanto en `.sh` como en `.zsh`, `--full` activa plugins de `tmux` y una configuracion opinionada de `neovim`
-- la configuracion generada de `neovim` ya no queda en un unico `init.lua`; se separa en modulos para mantenimiento mas simple
-- la configuracion de `zsh`, `tmux`, `starship` y `neovim` ahora sale de plantillas versionadas en `templates/`
-- la logica del instalador se reparte ahora en modulos dentro de `lib/fedora-dev-setup/`
-- ambos entrypoints aceptan subcomandos para correr solo una etapa del setup
-- las etapas aisladas validan precondiciones minimas antes de correr
-- `doctor` permite auditar el estado del equipo sin instalar nada
-- `--setup-k8s` es opcional para no instalar herramientas de Kubernetes en maquinas donde no hacen falta
-- Si no queres tocar shell, base de datos local o contenedores, usa `--minimal`.
+- `gh auth login` runs interactively.
+- `--full` enables most useful extras for a primary development machine.
+- in both `.sh` and `.zsh`, `--full` also enables `tmux` plugins and an opinionated `neovim` setup
+- generated `neovim` configuration no longer lives in a single `init.lua`; it is split into modules for easier maintenance
+- `zsh`, `tmux`, `starship`, and `neovim` configuration now come from versioned templates under `templates/`
+- installer logic is now split into modules under `lib/fedora-dev-setup/`
+- both entrypoints accept subcommands so you can run only one setup stage
+- isolated stages validate minimal preconditions before they run
+- `doctor` lets you audit the machine state without installing anything
+- `--setup-k8s` is optional so Kubernetes tooling is not installed on machines that do not need it
+- if you do not want to touch the shell, local database, or containers, use `--minimal`
