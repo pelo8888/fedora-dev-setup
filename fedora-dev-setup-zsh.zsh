@@ -18,6 +18,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT_NAME="${0:t}"
 CONFIG_ROOT="${XDG_CONFIG_HOME:-${USER_HOME}/.config}/fedora-dev-setup"
 STAGE="all"
+INTERACTIVE=0
 SETUP_SSH=0
 SETUP_GPG=0
 SETUP_GH=0
@@ -88,6 +89,7 @@ Opciones:
   --make-zsh-default
   --skip-vscode
   --skip-vscode-extensions
+  --interactive
   --help
 
 Tambien soporta estas variables de entorno:
@@ -101,6 +103,7 @@ Notas:
   - shell escribe la configuracion de zsh, tmux y neovim, y puede cambiar el shell por defecto.
   - services instala o configura Podman, PostgreSQL y herramientas de Kubernetes.
   - doctor no instala nada: inspecciona si el sistema ya cumple lo esperado.
+  - --interactive pregunta por cada etapa y espera una respuesta y/n antes de ejecutarla.
   - Las etapas fuera de all validan precondiciones basicas y abortan si faltan binarios esperados.
   - --full activa SSH, GPG, firma de commits, GitHub CLI, Podman, PostgreSQL,
     neovim opinionado, plugins de tmux y deja zsh como shell por defecto.
@@ -249,6 +252,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-vscode-extensions)
       INSTALL_VSCODE_EXTENSIONS=0
+      shift
+      ;;
+    --interactive)
+      INTERACTIVE=1
       shift
       ;;
     --help|-h)
@@ -437,25 +444,25 @@ require_fedora
 
 case "${STAGE}" in
   all)
-    run_bootstrap_stage
-    run_devtools_stage
-    run_shell_stage
-    run_services_stage
+    run_stage_with_confirmation "bootstrap" run_bootstrap_stage
+    run_stage_with_confirmation "devtools" run_devtools_stage
+    run_stage_with_confirmation "shell" run_shell_stage
+    run_stage_with_confirmation "services" run_services_stage
     ;;
   bootstrap)
-    run_bootstrap_stage
+    run_stage_with_confirmation "bootstrap" run_bootstrap_stage
     ;;
   devtools)
-    run_devtools_stage
+    run_stage_with_confirmation "devtools" run_devtools_stage
     ;;
   shell)
-    run_shell_stage
+    run_stage_with_confirmation "shell" run_shell_stage
     ;;
   services)
-    run_services_stage
+    run_stage_with_confirmation "services" run_services_stage
     ;;
   doctor)
-    run_doctor_stage
+    run_stage_with_confirmation "doctor" run_doctor_stage
     exit $?
     ;;
 esac
