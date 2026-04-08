@@ -34,6 +34,10 @@ bindkey '^[[1;5C' forward-word
 bindkey '^[[1;5D' backward-word
 bindkey '^[[H' beginning-of-line
 bindkey '^[[F' end-of-line
+bindkey '^[[3~' delete-char
+bindkey '^[3;5~' delete-char
+bindkey '\e[3~' delete-char
+bindkey "${terminfo[kdch1]}" delete-char
 
 export FZF_DEFAULT_COMMAND='fd --type f --hidden --follow --exclude .git'
 export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
