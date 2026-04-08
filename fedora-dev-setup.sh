@@ -12,36 +12,23 @@ if ! command -v sudo >/dev/null 2>&1; then
   exit 1
 fi
 
-require_fedora() {
-  if [[ ! -r /etc/os-release ]]; then
-    echo "No pude detectar la distribucion. Este script requiere Fedora."
-    exit 1
-  fi
-
-  # shellcheck disable=SC1091
-  . /etc/os-release
-
-  if [[ "${ID:-}" != "fedora" ]]; then
-    echo "Distribucion detectada: ${PRETTY_NAME:-desconocida}"
-    echo "Este script esta pensado para Fedora y aborta para evitar cambios incompatibles."
-    exit 1
-  fi
-}
-
 USER_HOME="${HOME}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCRIPT_NAME="$(basename "$0")"
-PROFILE_FILES=("${USER_HOME}/.bashrc" "${USER_HOME}/.zshrc")
+CONFIG_ROOT="${XDG_CONFIG_HOME:-${USER_HOME}/.config}/fedora-dev-setup"
+STAGE="all"
 SETUP_SSH=0
 SETUP_GPG=0
 SETUP_GH=0
 SETUP_PODMAN=0
 SETUP_POSTGRES=0
-SETUP_ZSH=0
+SETUP_K8S=0
+SETUP_TMUX_PLUGINS=0
+SETUP_NVIM_EXTRAS=0
 MAKE_ZSH_DEFAULT=0
-SETUP_ALIASES=0
 SIGN_COMMITS=0
-PROFILE_MINIMAL=0
-PROFILE_FULL=0
+INSTALL_VSCODE=1
+INSTALL_VSCODE_EXTENSIONS=1
 GIT_NAME="${GIT_NAME:-}"
 GIT_EMAIL="${GIT_EMAIL:-}"
 SSH_EMAIL="${SSH_EMAIL:-}"
@@ -56,30 +43,26 @@ GH_PROTOCOL="${GH_PROTOCOL:-ssh}"
 usage() {
   cat <<EOF
 Uso:
-  ./${SCRIPT_NAME} [opciones]
+  ./${SCRIPT_NAME} [all|bootstrap|devtools|shell|services|doctor] [opciones]
 
 Que hace este script:
   - Actualiza Fedora con dnf.
-  - Agrega el repositorio oficial RPM de Visual Studio Code.
-  - Instala herramientas base para desarrollo web:
-    git, gh, python, pip, pipx, node, npm, compiladores, ripgrep, fd, fzf, tmux y utilidades varias.
-  - Configura npm para instalar paquetes globales en ~/.local/bin.
+  - Instala herramientas de terminal y desarrollo:
+    git, gh, node, npm, pipx, neovim, tmux, ripgrep, fd, fzf, jq, delta y compiladores.
+  - Intenta instalar extras de terminal si estan disponibles:
+    eza, bat, zoxide, direnv, atuin, starship, btop, htop, lazygit y tealdeer.
+  - Configura npm global en ~/.local/bin.
   - Habilita corepack y prepara pnpm y yarn.
   - Instala herramientas globales de Node:
     @openai/codex, npm-check-updates y typescript.
-  - Configura Git con valores globales si le pasas nombre y email.
-  - Opcionalmente genera una clave SSH para GitHub.
-  - Opcionalmente genera una clave GPG para firmar commits.
-  - Opcionalmente habilita firma de commits en Git.
-  - Opcionalmente lanza autenticacion interactiva de GitHub CLI.
-  - Opcionalmente instala Podman con compatibilidad para usar el comando docker.
-  - Opcionalmente instala PostgreSQL local, inicializa la base y habilita el servicio.
-  - Opcionalmente instala zsh y puede dejarlo como shell por defecto.
-  - Opcionalmente agrega aliases utiles de terminal, git y codex.
-  - Instala extensiones base de Visual Studio Code.
-  - Muestra un resumen final con versiones y rutas de claves generadas.
+  - Escribe configuracion gestionada para zsh, tmux, starship y Git.
+  - Puede dejar listo neovim con una configuracion modular y extras opinionados.
+  - Opcionalmente configura Git, SSH, GPG y GitHub CLI.
+  - Opcionalmente instala Podman, PostgreSQL local y herramientas de Kubernetes.
+  - Opcionalmente instala Visual Studio Code y extensiones base.
 
 Opciones:
+  all|bootstrap|devtools|shell|services|doctor
   --minimal
   --full
   --git-name "Tu Nombre"
@@ -96,10 +79,15 @@ Opciones:
   --gh-protocol ssh|https
   --setup-podman
   --setup-postgres
+  --setup-k8s
+  --setup-tmux-plugins
+  --setup-nvim-extras
   --setup-zsh
-  --make-zsh-default
   --setup-aliases
   --sign-commits
+  --make-zsh-default
+  --skip-vscode
+  --skip-vscode-extensions
   --help
 
 Tambien soporta estas variables de entorno:
@@ -107,14 +95,21 @@ Tambien soporta estas variables de entorno:
   GPG_NAME, GPG_EMAIL, GPG_PASSPHRASE, GH_PROTOCOL
 
 Notas:
-  - --minimal instala el entorno base de desarrollo web sin extras opcionales.
-  - --full activa GitHub, SSH, GPG, firma de commits, Podman, PostgreSQL, zsh y aliases.
-  - --setup-gh ejecuta 'gh auth login' de forma interactiva.
-  - Si usas --setup-gh con --gh-protocol ssh, conviene combinarlo con --setup-ssh.
-  - Si usas --sign-commits sin --setup-gpg, el script espera que ya exista una clave GPG configurada.
-  - --setup-postgres inicializa y habilita PostgreSQL local para desarrollo.
-  - --make-zsh-default requiere --setup-zsh y cambia tu shell con chsh.
-  - El script esta pensado para correrse como usuario normal con sudo disponible.
+  - Si no indicas subcomando, usa all.
+  - bootstrap instala repos y paquetes base.
+  - devtools configura npm, corepack, herramientas globales, Git, SSH, GPG, gh y extensiones.
+  - shell escribe la configuracion de zsh, tmux y neovim, y puede cambiar el shell por defecto.
+  - services instala o configura Podman, PostgreSQL y herramientas de Kubernetes.
+  - doctor no instala nada: inspecciona si el sistema ya cumple lo esperado.
+  - Las etapas fuera de all validan precondiciones basicas y abortan si faltan binarios esperados.
+  - --minimal se mantiene por compatibilidad y equivale a all sin extras opcionales.
+  - --setup-zsh y --setup-aliases se mantienen por compatibilidad; el shell stage ya gestiona esa configuracion.
+  - --full activa SSH, GPG, firma de commits, GitHub CLI, Podman, PostgreSQL,
+    neovim opinionado, plugins de tmux y deja zsh como shell por defecto.
+  - --setup-k8s es opt-in y agrega kubectl, helm y k9s si hay paquetes disponibles.
+  - La configuracion gestionada queda en ~/.config/fedora-dev-setup/.
+  - --skip-vscode evita agregar el repo de VS Code e instalar el paquete code.
+  - --skip-vscode-extensions solo evita la instalacion de extensiones.
 EOF
 }
 
@@ -128,14 +123,43 @@ require_value() {
   fi
 }
 
+is_valid_stage() {
+  case "$1" in
+    all|bootstrap|devtools|shell|services|doctor)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+if [[ $# -gt 0 && "$1" != --* ]]; then
+  if is_valid_stage "$1"; then
+    STAGE="$1"
+    shift
+  else
+    echo "Subcomando no reconocido: $1"
+    usage
+    exit 1
+  fi
+fi
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --minimal)
-      PROFILE_MINIMAL=1
       shift
       ;;
     --full)
-      PROFILE_FULL=1
+      SETUP_SSH=1
+      SETUP_GPG=1
+      SETUP_GH=1
+      SETUP_PODMAN=1
+      SETUP_POSTGRES=1
+      SETUP_TMUX_PLUGINS=1
+      SETUP_NVIM_EXTRAS=1
+      SIGN_COMMITS=1
+      MAKE_ZSH_DEFAULT=1
       shift
       ;;
     --git-name)
@@ -203,20 +227,36 @@ while [[ $# -gt 0 ]]; do
       SETUP_POSTGRES=1
       shift
       ;;
-    --setup-zsh)
-      SETUP_ZSH=1
+    --setup-k8s)
+      SETUP_K8S=1
+      shift
+      ;;
+    --setup-tmux-plugins)
+      SETUP_TMUX_PLUGINS=1
+      shift
+      ;;
+    --setup-nvim-extras)
+      SETUP_NVIM_EXTRAS=1
+      shift
+      ;;
+    --setup-zsh|--setup-aliases)
+      shift
+      ;;
+    --sign-commits)
+      SIGN_COMMITS=1
       shift
       ;;
     --make-zsh-default)
       MAKE_ZSH_DEFAULT=1
       shift
       ;;
-    --setup-aliases)
-      SETUP_ALIASES=1
+    --skip-vscode)
+      INSTALL_VSCODE=0
+      INSTALL_VSCODE_EXTENSIONS=0
       shift
       ;;
-    --sign-commits)
-      SIGN_COMMITS=1
+    --skip-vscode-extensions)
+      INSTALL_VSCODE_EXTENSIONS=0
       shift
       ;;
     --help|-h)
@@ -231,429 +271,201 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${PROFILE_MINIMAL}" -eq 1 && "${PROFILE_FULL}" -eq 1 ]]; then
-  echo "No puedes usar --minimal y --full al mismo tiempo."
-  exit 1
-fi
-
-if [[ "${PROFILE_FULL}" -eq 1 ]]; then
-  SETUP_SSH=1
-  SETUP_GPG=1
-  SETUP_GH=1
-  SETUP_PODMAN=1
-  SETUP_POSTGRES=1
-  SETUP_ZSH=1
-  MAKE_ZSH_DEFAULT=1
-  SETUP_ALIASES=1
-  SIGN_COMMITS=1
-fi
-
 if [[ "${GH_PROTOCOL}" != "ssh" && "${GH_PROTOCOL}" != "https" ]]; then
   echo "Valor invalido para --gh-protocol: ${GH_PROTOCOL}. Usa ssh o https."
   exit 1
 fi
 
-if [[ "${MAKE_ZSH_DEFAULT}" -eq 1 && "${SETUP_ZSH}" -ne 1 ]]; then
-  echo "Usa --make-zsh-default junto con --setup-zsh."
-  exit 1
-fi
+source_lib() {
+  local lib_path="$1"
+
+  if [[ ! -r "${lib_path}" ]]; then
+    echo "Falta el modulo requerido: ${lib_path}"
+    exit 1
+  fi
+
+  # shellcheck disable=SC1090
+  . "${lib_path}"
+}
+
+source_lib "${SCRIPT_DIR}/lib/fedora-dev-setup/common.zsh"
+source_lib "${SCRIPT_DIR}/lib/fedora-dev-setup/packages.zsh"
+source_lib "${SCRIPT_DIR}/lib/fedora-dev-setup/auth.zsh"
+source_lib "${SCRIPT_DIR}/lib/fedora-dev-setup/workstation.zsh"
+
+run_bootstrap_stage() {
+  log "Etapa bootstrap"
+  log "Actualizando Fedora"
+  sudo dnf -y upgrade --refresh
+
+  install_vscode_repo
+  install_mandatory_packages
+  install_optional_packages
+}
+
+run_devtools_stage() {
+  log "Etapa devtools"
+  require_commands "devtools" git npm pipx python3
+
+  configure_npm_prefix
+
+  log "Habilitando gestores JS comunes"
+  corepack enable || true
+  corepack prepare pnpm@latest --activate || true
+  corepack prepare yarn@stable --activate || true
+
+  log "Instalando herramientas globales de Node"
+  npm install -g @openai/codex npm-check-updates typescript
+
+  log "Asegurando pipx en PATH"
+  pipx ensurepath >/dev/null || true
+
+  log "Configurando Git"
+  configure_git_if_requested
+  configure_terminal_git
+
+  if [[ "${SETUP_SSH}" -eq 1 ]]; then
+    setup_ssh_key
+  fi
+
+  if [[ "${SETUP_GPG}" -eq 1 ]]; then
+    setup_gpg_key
+  fi
+
+  if [[ "${SETUP_GH}" -eq 1 ]]; then
+    setup_github_cli_auth
+  fi
+
+  install_vscode_extensions
+}
+
+run_shell_stage() {
+  log "Etapa shell"
+  require_commands "shell" zsh tmux nvim
+
+  write_managed_configs
+  setup_zsh_shell
+
+  if [[ "${SETUP_TMUX_PLUGINS}" -eq 1 ]]; then
+    setup_tmux_plugins
+  fi
+
+  refresh_terminal_caches
+}
+
+run_services_stage() {
+  log "Etapa services"
+  require_commands "services" sudo dnf systemctl
+  if [[ "${SETUP_K8S}" -eq 1 ]]; then
+    require_commands "services" rpm
+  fi
+
+  if [[ "${SETUP_PODMAN}" -eq 1 ]]; then
+    setup_podman_stack
+  fi
+
+  if [[ "${SETUP_POSTGRES}" -eq 1 ]]; then
+    setup_postgres_local
+  fi
+
+  if [[ "${SETUP_K8S}" -eq 1 ]]; then
+    setup_k8s_tools
+  fi
+}
+
+run_doctor_stage() {
+  local failures=0
+  local nvim_root="${XDG_CONFIG_HOME:-${USER_HOME}/.config}/nvim"
+
+  log "Etapa doctor"
+  echo "No se realizaran cambios. Solo se inspecciona el estado actual."
+  printf 'stage: %s\n' "${STAGE}"
+  printf 'config root: %s\n' "${CONFIG_ROOT}"
+  printf 'shell actual: %s\n' "${SHELL}"
+
+  echo
+  echo "Precondiciones por etapa"
+  doctor_check_commands "bootstrap" sudo dnf rpm || ((failures += 1))
+  doctor_check_commands "devtools" git npm pipx python3 || ((failures += 1))
+  doctor_check_commands "shell" zsh tmux nvim || ((failures += 1))
+  doctor_check_commands "services" sudo dnf systemctl || ((failures += 1))
+
+  echo
+  echo "Configuracion gestionada"
+  doctor_check_file "zprofile gestionado" "${CONFIG_ROOT}/zprofile.zsh" || ((failures += 1))
+  doctor_check_file "zshrc gestionado" "${CONFIG_ROOT}/zshrc.zsh" || ((failures += 1))
+  doctor_check_file "tmux gestionado" "${CONFIG_ROOT}/tmux.conf" || ((failures += 1))
+  doctor_check_file "starship gestionado" "${CONFIG_ROOT}/starship.toml" || ((failures += 1))
+  doctor_check_file "nvim init" "${nvim_root}/init.lua" || ((failures += 1))
+  doctor_check_file "nvim profile" "${nvim_root}/lua/fedora/profile.lua" || ((failures += 1))
+
+  echo
+  echo "Extras segun flags"
+  if [[ "${SETUP_SSH}" -eq 1 ]]; then
+    doctor_check_file "ssh public key" "${SSH_KEY_PATH}.pub" || ((failures += 1))
+  fi
+  if [[ "${SETUP_GPG}" -eq 1 ]]; then
+    doctor_check_file "gpg public key" "${USER_HOME}/.gnupg/github-signing-key.asc" || ((failures += 1))
+  fi
+  if [[ "${SETUP_GH}" -eq 1 ]]; then
+    if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+      echo "[ok] gh auth"
+    else
+      echo "[missing] gh auth"
+      ((failures += 1))
+    fi
+  fi
+  if [[ "${SETUP_PODMAN}" -eq 1 ]]; then
+    doctor_check_commands "podman" podman || ((failures += 1))
+  fi
+  if [[ "${SETUP_POSTGRES}" -eq 1 ]]; then
+    doctor_check_commands "postgres" psql || ((failures += 1))
+  fi
+  if [[ "${SETUP_K8S}" -eq 1 ]]; then
+    doctor_check_commands "k8s" kubectl helm k9s || ((failures += 1))
+  fi
+  if [[ "${SETUP_TMUX_PLUGINS}" -eq 1 ]]; then
+    doctor_check_file "tmux plugin manager" "${USER_HOME}/.tmux/plugins/tpm/tpm" || ((failures += 1))
+  fi
+  if [[ "${SETUP_NVIM_EXTRAS}" -eq 1 ]]; then
+    doctor_check_file "nvim lazy config" "${nvim_root}/lua/fedora/lazy.lua" || ((failures += 1))
+  fi
+
+  echo
+  if (( failures == 0 )); then
+    echo "Doctor: OK"
+    return 0
+  fi
+
+  echo "Doctor: faltan ${failures} comprobaciones"
+  return 1
+}
 
 require_fedora
 
-log() {
-  printf '\n[%s] %s\n' "$(date '+%H:%M:%S')" "$*"
-}
+case "${STAGE}" in
+  all)
+    run_bootstrap_stage
+    run_devtools_stage
+    run_shell_stage
+    run_services_stage
+    ;;
+  bootstrap)
+    run_bootstrap_stage
+    ;;
+  devtools)
+    run_devtools_stage
+    ;;
+  shell)
+    run_shell_stage
+    ;;
+  services)
+    run_services_stage
+    ;;
+  doctor)
+    run_doctor_stage
+    exit $?
+    ;;
+esac
 
-append_if_missing() {
-  local file="$1"
-  local line="$2"
-
-  touch "${file}"
-  if ! grep -Fqx "${line}" "${file}"; then
-    printf '%s\n' "${line}" >>"${file}"
-  fi
-}
-
-append_block_if_missing() {
-  local file="$1"
-  local marker="$2"
-  local content="$3"
-
-  touch "${file}"
-  if ! grep -Fq "${marker}" "${file}"; then
-    printf '\n%s\n' "${content}" >>"${file}"
-  fi
-}
-
-install_vscode_repo() {
-  log "Configurando el repo oficial de Visual Studio Code"
-  sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
-  sudo tee /etc/yum.repos.d/vscode.repo >/dev/null <<'EOF'
-[code]
-name=Visual Studio Code
-baseurl=https://packages.microsoft.com/yumrepos/vscode
-enabled=1
-autorefresh=1
-type=rpm-md
-gpgcheck=1
-gpgkey=https://packages.microsoft.com/keys/microsoft.asc
-EOF
-}
-
-configure_npm_prefix() {
-  log "Configurando npm global en ~/.local"
-  mkdir -p "${USER_HOME}/.local/bin" "${USER_HOME}/.npm-global"
-  npm config set prefix "${USER_HOME}/.local"
-  append_if_missing "${USER_HOME}/.profile" 'export PATH="$HOME/.local/bin:$PATH"'
-
-  for profile in "${PROFILE_FILES[@]}"; do
-    append_if_missing "${profile}" 'export PATH="$HOME/.local/bin:$PATH"'
-  done
-
-  export PATH="${USER_HOME}/.local/bin:${PATH}"
-}
-
-install_vscode_extensions() {
-  if ! command -v code >/dev/null 2>&1; then
-    log "Saltando extensiones de VS Code porque 'code' no quedo disponible en PATH"
-    return
-  fi
-
-  local extensions=(
-    "dbaeumer.vscode-eslint"
-    "esbenp.prettier-vscode"
-    "ms-python.python"
-    "ms-python.vscode-pylance"
-    "bradlc.vscode-tailwindcss"
-    "ms-azuretools.vscode-docker"
-    "eamodio.gitlens"
-  )
-
-  log "Instalando extensiones base de VS Code"
-  for ext in "${extensions[@]}"; do
-    code --install-extension "${ext}" --force >/dev/null || true
-  done
-}
-
-configure_git_if_requested() {
-  if [[ -n "${GIT_NAME:-}" ]]; then
-    git config --global user.name "${GIT_NAME}"
-  fi
-
-  if [[ -n "${GIT_EMAIL:-}" ]]; then
-    git config --global user.email "${GIT_EMAIL}"
-  fi
-
-  git config --global init.defaultBranch main
-  git config --global pull.rebase false
-}
-
-setup_ssh_key() {
-  local ssh_email="${SSH_EMAIL:-${GIT_EMAIL:-}}"
-
-  if [[ -z "${ssh_email}" ]]; then
-    echo "Para --setup-ssh necesitas --ssh-email o --git-email."
-    exit 1
-  fi
-
-  log "Configurando clave SSH"
-  mkdir -p "$(dirname "${SSH_KEY_PATH}")"
-  chmod 700 "$(dirname "${SSH_KEY_PATH}")"
-
-  if [[ -f "${SSH_KEY_PATH}" ]]; then
-    log "La clave SSH ya existe en ${SSH_KEY_PATH}; no se regenera"
-  else
-    ssh-keygen -t ed25519 -C "${ssh_email}" -f "${SSH_KEY_PATH}" -N "${SSH_PASSPHRASE}"
-    if [[ -z "${SSH_PASSPHRASE}" ]]; then
-      log "La clave SSH se genero sin passphrase. Si no quieres eso, rerun con --ssh-passphrase."
-    fi
-  fi
-
-  if [[ ! -f "${USER_HOME}/.ssh/config" ]]; then
-    touch "${USER_HOME}/.ssh/config"
-    chmod 600 "${USER_HOME}/.ssh/config"
-  fi
-
-  if ! grep -Fq "IdentityFile ${SSH_KEY_PATH}" "${USER_HOME}/.ssh/config"; then
-    cat >>"${USER_HOME}/.ssh/config" <<EOF
-Host github.com
-  HostName github.com
-  User git
-  IdentityFile ${SSH_KEY_PATH}
-  IdentitiesOnly yes
-EOF
-  fi
-}
-
-setup_gpg_key() {
-  local gpg_name="${GPG_NAME:-${GIT_NAME:-}}"
-  local gpg_email="${GPG_EMAIL:-${GIT_EMAIL:-}}"
-  local uid existing_key batch_file pub_file
-
-  if [[ -z "${gpg_name}" || -z "${gpg_email}" ]]; then
-    echo "Para --setup-gpg necesitas nombre y email. Usa --gpg-name/--gpg-email o --git-name/--git-email."
-    exit 1
-  fi
-
-  uid="${gpg_name} <${gpg_email}>"
-  existing_key="$(gpg --list-secret-keys --with-colons "${uid}" 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')"
-
-  if [[ -n "${existing_key}" ]]; then
-    GENERATED_GPG_KEY="${existing_key}"
-    log "Ya existe una clave GPG para ${uid}; se reutiliza"
-  else
-    log "Generando clave GPG para firma de commits"
-    batch_file="$(mktemp)"
-    {
-      echo "Key-Type: eddsa"
-      echo "Key-Curve: ed25519"
-      echo "Subkey-Type: ecdh"
-      echo "Subkey-Curve: cv25519"
-      echo "Name-Real: ${gpg_name}"
-      echo "Name-Email: ${gpg_email}"
-      echo "Expire-Date: 0"
-      if [[ -n "${GPG_PASSPHRASE}" ]]; then
-        echo "Passphrase: ${GPG_PASSPHRASE}"
-      else
-        echo "%no-protection"
-      fi
-      echo "%commit"
-    } >"${batch_file}"
-
-    gpg --batch --generate-key "${batch_file}"
-    rm -f "${batch_file}"
-    GENERATED_GPG_KEY="$(gpg --list-secret-keys --with-colons "${uid}" 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')"
-  fi
-
-  if [[ -z "${GENERATED_GPG_KEY}" ]]; then
-    echo "No pude obtener el fingerprint de la clave GPG."
-    exit 1
-  fi
-
-  git config --global user.signingkey "${GENERATED_GPG_KEY}"
-  git config --global gpg.format openpgp
-
-  if [[ "${SIGN_COMMITS}" -eq 1 ]]; then
-    git config --global commit.gpgsign true
-  fi
-
-  pub_file="${USER_HOME}/.gnupg/github-signing-key.asc"
-  gpg --armor --export "${GENERATED_GPG_KEY}" >"${pub_file}"
-
-  if [[ -z "${GPG_PASSPHRASE}" ]]; then
-    log "La clave GPG se genero sin passphrase. Si no quieres eso, rerun con --gpg-passphrase."
-  fi
-}
-
-setup_github_cli_auth() {
-  log "Configurando autenticacion de GitHub CLI"
-
-  if gh auth status >/dev/null 2>&1; then
-    log "GitHub CLI ya esta autenticado"
-  else
-    gh auth login --git-protocol "${GH_PROTOCOL}" --web
-  fi
-
-  gh auth setup-git >/dev/null 2>&1 || true
-}
-
-setup_podman_stack() {
-  log "Instalando stack de contenedores con Podman"
-  sudo dnf install -y podman podman-compose buildah skopeo podman-docker
-}
-
-setup_postgres_local() {
-  log "Instalando PostgreSQL local"
-  sudo dnf install -y postgresql postgresql-server postgresql-contrib libpq-devel
-
-  if [[ ! -f /var/lib/pgsql/data/PG_VERSION ]]; then
-    log "Inicializando cluster local de PostgreSQL"
-    sudo postgresql-setup --initdb
-  else
-    log "PostgreSQL ya estaba inicializado"
-  fi
-
-  sudo systemctl enable --now postgresql
-}
-
-setup_zsh_shell() {
-  log "Instalando zsh"
-  sudo dnf install -y zsh
-
-  if [[ "${MAKE_ZSH_DEFAULT}" -eq 1 ]]; then
-    local zsh_path
-    zsh_path="$(command -v zsh)"
-    if [[ -n "${zsh_path}" && "${SHELL}" != "${zsh_path}" ]]; then
-      log "Cambiando shell por defecto a zsh"
-      chsh -s "${zsh_path}"
-    fi
-  fi
-}
-
-setup_shell_aliases() {
-  local alias_block
-  alias_block=$(cat <<'EOF'
-# >>> fedora-webdev-bootstrap aliases >>>
-alias ll='ls -lah'
-alias la='ls -A'
-alias gs='git status -sb'
-alias ga='git add'
-alias gc='git commit'
-alias gp='git push'
-alias gl='git pull'
-alias gco='git checkout'
-alias gb='git branch'
-alias k='kubectl'
-alias cdx='codex'
-# <<< fedora-webdev-bootstrap aliases <<<
-EOF
-)
-
-  log "Agregando aliases utiles al shell"
-  append_block_if_missing "${USER_HOME}/.bashrc" "# >>> fedora-webdev-bootstrap aliases >>>" "${alias_block}"
-  append_block_if_missing "${USER_HOME}/.zshrc" "# >>> fedora-webdev-bootstrap aliases >>>" "${alias_block}"
-}
-
-log "Actualizando Fedora"
-sudo dnf -y upgrade --refresh
-
-install_vscode_repo
-
-log "Instalando paquetes base para desarrollo web"
-sudo dnf install -y \
-  bash-completion \
-  ca-certificates \
-  code \
-  curl \
-  fd-find \
-  fzf \
-  gcc \
-  gcc-c++ \
-  gh \
-  git \
-  git-delta \
-  gnupg2 \
-  jq \
-  make \
-  nodejs \
-  npm \
-  openssh-clients \
-  openssl \
-  openssl-devel \
-  patch \
-  pipx \
-  pinentry-gnome3 \
-  python-unversioned-command \
-  python3 \
-  python3-devel \
-  python3-pip \
-  python3-virtualenv \
-  readline-devel \
-  ripgrep \
-  rsync \
-  shellcheck \
-  sqlite \
-  sqlite-devel \
-  tmux \
-  unzip \
-  util-linux-user \
-  wget \
-  xz \
-  xz-devel \
-  zlib-devel \
-  bzip2 \
-  bzip2-devel \
-  libffi-devel
-
-configure_npm_prefix
-
-log "Habilitando gestores JS comunes"
-corepack enable || true
-corepack prepare pnpm@latest --activate || true
-corepack prepare yarn@stable --activate || true
-
-log "Instalando herramientas globales de Node"
-npm install -g @openai/codex npm-check-updates typescript
-
-log "Asegurando pipx en PATH"
-pipx ensurepath >/dev/null || true
-
-log "Configurando Git"
-configure_git_if_requested
-
-if [[ "${SETUP_SSH}" -eq 1 ]]; then
-  setup_ssh_key
-fi
-
-if [[ "${SETUP_GPG}" -eq 1 ]]; then
-  setup_gpg_key
-fi
-
-if [[ "${SETUP_GH}" -eq 1 ]]; then
-  setup_github_cli_auth
-fi
-
-if [[ "${SETUP_PODMAN}" -eq 1 ]]; then
-  setup_podman_stack
-fi
-
-if [[ "${SETUP_POSTGRES}" -eq 1 ]]; then
-  setup_postgres_local
-fi
-
-if [[ "${SETUP_ZSH}" -eq 1 ]]; then
-  setup_zsh_shell
-fi
-
-if [[ "${SETUP_ALIASES}" -eq 1 ]]; then
-  setup_shell_aliases
-fi
-
-install_vscode_extensions
-
-log "Resumen"
-if [[ "${PROFILE_MINIMAL}" -eq 1 ]]; then
-  printf 'profile: %s\n' "minimal"
-elif [[ "${PROFILE_FULL}" -eq 1 ]]; then
-  printf 'profile: %s\n' "full"
-else
-  printf 'profile: %s\n' "custom"
-fi
-printf 'git: %s\n' "$(git --version)"
-printf 'python: %s\n' "$(python --version)"
-printf 'pip: %s\n' "$(python -m pip --version)"
-printf 'node: %s\n' "$(node --version)"
-printf 'npm: %s\n' "$(npm --version)"
-printf 'pnpm: %s\n' "$(pnpm --version 2>/dev/null || echo 'no disponible')"
-printf 'code: %s\n' "$(code --version | head -n 1 2>/dev/null || echo 'no disponible')"
-printf 'codex: %s\n' "$(codex --version 2>/dev/null || echo 'no disponible')"
-if [[ "${SETUP_SSH}" -eq 1 ]]; then
-  printf 'ssh pubkey: %s\n' "${SSH_KEY_PATH}.pub"
-fi
-if [[ -n "${GENERATED_GPG_KEY}" ]]; then
-  printf 'gpg fingerprint: %s\n' "${GENERATED_GPG_KEY}"
-  printf 'gpg public key: %s\n' "${USER_HOME}/.gnupg/github-signing-key.asc"
-fi
-if [[ "${SETUP_GH}" -eq 1 ]]; then
-  printf 'gh protocol: %s\n' "${GH_PROTOCOL}"
-fi
-if [[ "${SETUP_PODMAN}" -eq 1 ]]; then
-  printf 'podman: %s\n' "$(podman --version 2>/dev/null || echo 'no disponible')"
-fi
-if [[ "${SETUP_POSTGRES}" -eq 1 ]]; then
-  printf 'psql: %s\n' "$(psql --version 2>/dev/null || echo 'no disponible')"
-fi
-if [[ "${SETUP_ZSH}" -eq 1 ]]; then
-  printf 'zsh: %s\n' "$(zsh --version 2>/dev/null || echo 'no disponible')"
-fi
-
-cat <<'EOF'
-
-Siguiente paso:
-  1. Cierra y vuelve a abrir la terminal para refrescar PATH.
-  2. Autentica Codex con: codex --login
-     o exporta OPENAI_API_KEY en tu shell.
-  3. Sube tu clave SSH publica a GitHub desde ~/.ssh/*.pub
-  4. Si generaste GPG, sube ~/.gnupg/github-signing-key.asc a GitHub como signing key.
-  5. Si activaste zsh por defecto, vuelve a iniciar sesion.
-EOF
+print_summary
