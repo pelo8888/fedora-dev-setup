@@ -1,0 +1,32 @@
+add_newline = false
+command_timeout = 1000
+format = "$directory$git_branch$git_status$nodejs$python$cmd_duration$line_break$character"
+
+[directory]
+truncation_length = 4
+truncate_to_repo = false
+style = "bold cyan"
+
+[git_branch]
+symbol = "git:"
+style = "bold purple"
+
+[git_status]
+style = "bold yellow"
+
+[nodejs]
+symbol = "node "
+style = "bold green"
+
+[python]
+symbol = "py "
+style = "bold blue"
+
+[cmd_duration]
+min_time = 500
+format = "took [$duration]($style) "
+style = "dimmed"
+
+[character]
+success_symbol = "[>](bold green)"
+error_symbol = "[>](bold red)"
