@@ -4,8 +4,8 @@ Script para preparar una instalacion fresca de Fedora para desarrollo web y trab
 
 ## Archivos
 
-- `fedora-dev-setup.sh`: script principal
-- `fedora-dev-setup-zsh.zsh`: variante nueva enfocada en `zsh` y terminal
+- `fedora-dev-setup.sh`: entrypoint en `bash`
+- `fedora-dev-setup-zsh.zsh`: entrypoint en `zsh`
 
 ## Requisitos
 
@@ -13,17 +13,21 @@ Script para preparar una instalacion fresca de Fedora para desarrollo web y trab
 - usuario normal con `sudo`
 - conexion a internet
 
-El script detecta la distro leyendo `/etc/os-release` y aborta si no encuentra Fedora.
+Ambos scripts detectan la distro leyendo `/etc/os-release` y abortan si no encuentran Fedora.
 
-## Revision rapida del script actual
+## Entrypoints
 
-El script original resuelve bien la instalacion base, pero en `zsh` se queda corto para uso diario:
+Los dos archivos ya tienen paridad funcional:
 
-- instala `zsh`, pero no deja una configuracion real de prompt, completions, historial ni keybindings
-- agrega aliases, pero no gestiona archivos dedicados para shell ni `tmux`
-- mezcla setup de shell con extras de escritorio y backend, cuando el uso de terminal merece una variante propia
+- soportan etapas `all`, `bootstrap`, `devtools`, `shell`, `services` y `doctor`
+- comparten la misma logica modular en `lib/fedora-dev-setup/`
+- usan las mismas plantillas versionadas en `templates/`
+- dejan listo un entorno de terminal con `zsh`, `tmux`, `git`, `neovim` y extras opcionales
 
-Por eso se agrega una segunda version orientada a `zsh`.
+La diferencia principal es el shell que ejecuta el entrypoint:
+
+- `fedora-dev-setup.sh`: pensado para correr desde `bash`
+- `fedora-dev-setup-zsh.zsh`: pensado para correr desde `zsh`
 
 ## Perfiles rapidos
 
@@ -44,7 +48,19 @@ Instalacion completa:
   --gpg-passphrase "tu-passphrase-gpg"
 ```
 
-Instalacion orientada a `zsh` y terminal:
+Instalacion completa desde `bash`:
+
+```bash
+./fedora-dev-setup.sh \
+  all \
+  --full \
+  --git-name "Tu Nombre" \
+  --git-email "tu@email.com" \
+  --ssh-passphrase "tu-passphrase-ssh" \
+  --gpg-passphrase "tu-passphrase-gpg"
+```
+
+Instalacion completa desde `zsh`:
 
 ```bash
 ./fedora-dev-setup-zsh.zsh \
@@ -56,7 +72,7 @@ Instalacion orientada a `zsh` y terminal:
   --gpg-passphrase "tu-passphrase-gpg"
 ```
 
-## Que incluye
+## Que incluyen
 
 Siempre instala:
 
@@ -67,7 +83,7 @@ Siempre instala:
 - `@openai/codex`, `npm-check-updates`, `typescript`
 - extensiones base de VS Code
 
-La variante `zsh` tambien:
+Ambos entrypoints tambien:
 
 - deja configurado `zsh` con historial, completions, `fzf`, aliases y funciones utiles
 - escribe configuracion gestionada en `~/.config/fedora-dev-setup/`
@@ -93,6 +109,7 @@ Opcionalmente puede configurar:
 
 ```bash
 ./fedora-dev-setup.sh \
+  all \
   --git-name "Tu Nombre" \
   --git-email "tu@email.com" \
   --setup-ssh \
@@ -104,9 +121,11 @@ Opcionalmente puede configurar:
   --gh-protocol ssh \
   --setup-podman \
   --setup-postgres \
-  --setup-zsh \
+  --setup-tmux-plugins \
+  --setup-nvim-extras \
+  --setup-k8s \
   --make-zsh-default \
-  --setup-aliases
+  --skip-vscode
 ```
 
 Ayuda completa:
@@ -140,7 +159,7 @@ Ejemplo custom de la variante `zsh`:
   --make-zsh-default
 ```
 
-Etapas disponibles en la variante `zsh`:
+Etapas disponibles en ambos entrypoints:
 
 - `all`: corre todo el flujo
 - `bootstrap`: actualiza Fedora e instala repos y paquetes base
@@ -159,6 +178,8 @@ Precondiciones por etapa:
 Ejemplos por etapa:
 
 ```bash
+./fedora-dev-setup.sh bootstrap
+./fedora-dev-setup.sh doctor --setup-gh --setup-podman --setup-tmux-plugins
 ./fedora-dev-setup-zsh.zsh bootstrap
 ./fedora-dev-setup-zsh.zsh devtools --setup-gh --setup-ssh --git-email "tu@email.com"
 ./fedora-dev-setup-zsh.zsh shell --setup-tmux-plugins --setup-nvim-extras --make-zsh-default
@@ -178,11 +199,11 @@ Ejemplos por etapa:
 
 - `gh auth login` corre de forma interactiva.
 - `--full` activa la mayoria de extras utiles para una maquina principal de desarrollo.
-- en la variante `zsh`, `--full` ahora tambien activa plugins de `tmux` y una configuracion opinionada de `neovim`
+- tanto en `.sh` como en `.zsh`, `--full` activa plugins de `tmux` y una configuracion opinionada de `neovim`
 - la configuracion generada de `neovim` ya no queda en un unico `init.lua`; se separa en modulos para mantenimiento mas simple
 - la configuracion de `zsh`, `tmux`, `starship` y `neovim` ahora sale de plantillas versionadas en `templates/`
-- la logica del instalador `zsh` se reparte ahora en modulos dentro de `lib/fedora-dev-setup/`
-- la variante `zsh` acepta subcomandos para correr solo una etapa del setup
+- la logica del instalador se reparte ahora en modulos dentro de `lib/fedora-dev-setup/`
+- ambos entrypoints aceptan subcomandos para correr solo una etapa del setup
 - las etapas aisladas validan precondiciones minimas antes de correr
 - `doctor` permite auditar el estado del equipo sin instalar nada
 - `--setup-k8s` es opcional para no instalar herramientas de Kubernetes en maquinas donde no hacen falta
