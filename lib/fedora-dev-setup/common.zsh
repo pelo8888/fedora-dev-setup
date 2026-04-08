@@ -121,3 +121,44 @@ doctor_check_file() {
   printf '[missing] %s: %s\n' "${label}" "${path}"
   return 1
 }
+
+prompt_yes_no() {
+  local prompt="$1"
+  local answer normalized
+
+  while true; do
+    printf '%s [y/n]: ' "${prompt}"
+    if ! IFS= read -r answer; then
+      echo
+      echo "Input cancelled."
+      exit 1
+    fi
+
+    normalized="$(printf '%s' "${answer}" | tr '[:upper:]' '[:lower:]')"
+    case "${normalized}" in
+      y|yes)
+        return 0
+        ;;
+      n|no)
+        return 1
+        ;;
+      *)
+        echo "Please answer y or n."
+        ;;
+    esac
+  done
+}
+
+run_stage_with_confirmation() {
+  local stage_name="$1"
+  local function_name="$2"
+
+  if [[ "${INTERACTIVE:-0}" -eq 1 ]]; then
+    if ! prompt_yes_no "Run stage '${stage_name}'?"; then
+      log "Skipping stage ${stage_name}"
+      return 0
+    fi
+  fi
+
+  "${function_name}"
+}

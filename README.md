@@ -37,17 +37,6 @@ Base installation:
 ./fedora-dev-setup.sh --minimal
 ```
 
-Full installation:
-
-```bash
-./fedora-dev-setup.sh \
-  --full \
-  --git-name "Your Name" \
-  --git-email "your@email.com" \
-  --ssh-passphrase "your-ssh-passphrase" \
-  --gpg-passphrase "your-gpg-passphrase"
-```
-
 Full installation from `bash`:
 
 ```bash
@@ -60,6 +49,15 @@ Full installation from `bash`:
   --gpg-passphrase "your-gpg-passphrase"
 ```
 
+Interactive full installation from `bash`:
+
+```bash
+./fedora-dev-setup.sh \
+  all \
+  --full \
+  --interactive
+```
+
 Full installation from `zsh`:
 
 ```bash
@@ -70,6 +68,15 @@ Full installation from `zsh`:
   --git-email "your@email.com" \
   --ssh-passphrase "your-ssh-passphrase" \
   --gpg-passphrase "your-gpg-passphrase"
+```
+
+Interactive full installation from `zsh`:
+
+```bash
+./fedora-dev-setup-zsh.zsh \
+  all \
+  --full \
+  --interactive
 ```
 
 ## What They Include
@@ -167,6 +174,61 @@ Stages available in both entrypoints:
 - `shell`: writes `zsh`, `tmux`, and `neovim` configuration, and can optionally change the default shell
 - `services`: installs `podman`, `postgresql`, and Kubernetes tooling depending on the flags used
 - `doctor`: installs nothing; checks whether the system already satisfies the expected prerequisites and whether expected files/configs exist
+
+## Interactive Mode
+
+Use `--interactive` when you want the script to ask before running each stage.
+
+Behavior:
+
+- the script prompts stage by stage in execution order
+- each prompt expects `y` or `n`
+- answering `y` runs that stage
+- answering `n` skips that stage and continues
+- this works with both `all` and a single stage such as `shell` or `doctor`
+
+Examples:
+
+```bash
+./fedora-dev-setup.sh all --full --interactive
+./fedora-dev-setup.sh shell --interactive --setup-tmux-plugins --setup-nvim-extras
+./fedora-dev-setup-zsh.zsh all --interactive --setup-gh --setup-podman
+./fedora-dev-setup-zsh.zsh doctor --interactive --setup-k8s
+```
+
+Example prompt flow:
+
+```text
+Run stage 'bootstrap'? [y/n]:
+Run stage 'devtools'? [y/n]:
+Run stage 'shell'? [y/n]:
+Run stage 'services'? [y/n]:
+```
+
+## Doctor Mode
+
+Use `doctor` when you want to inspect the machine state without changing anything.
+
+Common use cases:
+
+- verify whether a machine is already ready before running `all`
+- check whether an isolated stage like `devtools` or `shell` has its required commands available
+- confirm that managed files under `~/.config/fedora-dev-setup/` were actually written
+- audit optional extras such as GitHub CLI auth, Podman, tmux plugins, Kubernetes tools, or generated SSH/GPG files
+
+Examples:
+
+```bash
+./fedora-dev-setup.sh doctor
+./fedora-dev-setup.sh doctor --setup-gh --setup-podman --setup-tmux-plugins
+./fedora-dev-setup-zsh.zsh doctor --setup-gh --setup-podman --setup-k8s
+```
+
+What it checks:
+
+- stage preconditions
+- managed config files
+- extra tools and files based on the flags you pass
 
 Stage preconditions:
 
